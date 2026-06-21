@@ -22,3 +22,17 @@ services:
       context: ../order-service
       dockerfile: Dockerfile
     image: ${DOCKERHUB_USERNAME:-your-dockerhub-username}/order-service:${IMAGE_TAG:-latest}
+
+  user-service:
+    build:
+      context: ../user-service
+      dockerfile: Dockerfile
+    image: ${DOCKERHUB_USERNAME:-your-dockerhub-username}/user-service:${IMAGE_TAG:-latest}
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    image: ${DOCKERHUB_USERNAME:-your-dockerhub-username}/frontend:${IMAGE_TAG:-latest}

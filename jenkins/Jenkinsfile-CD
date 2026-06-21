@@ -1,38 +1,47 @@
 pipeline {
-    agent any
-    
-    environment {
-        AWS_CREDENTIALS = credentials('aws-credentials')
-        GITHUB_CREDENTIALS = credentials('github-token')
-        DOCKERHUB_USERNAME = 'your-dockerhub-username'
-        EKS_CLUSTER_NAME = 'ecommerce-cluster'
-        AWS_REGION = 'us-east-1'
-        K8S_REPO = 'https://github.com/yourusername/ecommerce-k8s-manifests.git'
-        SERVICES = 'api-gateway product-service order-service'
+    agent {
+        label 'jenkins-slave'
     }
     
     parameters {
         string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'Docker image tag to deploy')
-        choice(name: 'ENVIRONMENT', choices: ['staging', 'production'], description: 'Deployment environment')
-        booleanParam(name: 'DRY_RUN', defaultValue: false, description: 'Perform dry run without actual deployment')
+        string(name: 'DEPLOY_ENVIRONMENT', defaultValue: 'production', description: 'Deployment environment')
+    }
+    
+    environment {
+        DOCKERHUB_USERNAME = 'your-dockerhub-username'
+        KUBECONFIG = '/home/jenkins/.kube/config'
+        K8S_MANIFESTS_PATH = 'k8s/k3s-demo-ultra'
+        NAMESPACE = "${params.DEPLOY_ENVIRONMENT}"
     }
     
     stages {
-        stage('Checkout K8s Manifests') {
+        stage('Checkout') {
             steps {
                 cleanWs()
-                git branch: 'main', credentialsId: 'github-token', url: "${K8S_REPO}"
+                checkout scm
+                sh 'git log --oneline -1'
             }
         }
         
-        stage('Configure AWS') {
+        stage('Configure kubectl') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                script {
+                    echo "Configuring kubectl for k3s cluster..."
                     sh """
-                        aws configure set aws_access_key_id ${AWS_ACCESS_KEY_ID}
-                        aws configure set aws_secret_access_key ${AWS_SECRET_ACCESS_KEY}
-                        aws configure set region ${AWS_REGION}
-                        aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
+                        kubectl version --client
+                        kubectl get nodes
+                    """
+                }
+            }
+        }
+        
+        stage('Create Namespace') {
+            steps {
+                script {
+                    echo "Creating namespace: ${NAMESPACE}..."
+                    sh """
+                        kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
                     """
                 }
             }
@@ -41,117 +50,117 @@ pipeline {
         stage('Update Image Tags') {
             steps {
                 script {
-                    def tag = params.IMAGE_TAG == 'latest' ? sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim() : params.IMAGE_TAG
-                    
-                    SERVICES.split(' ').each { service ->
-                        echo "Updating ${service} image tag to ${tag}..."
-                        sh """
-                            sed -i 's|image: ${DOCKERHUB_USERNAME}/${service}:.*|image: ${DOCKERHUB_USERNAME}/${service}:${tag}|g' k8s/base/deployment-${service}.yaml
-                        """
-                    }
-                    
-                    // Show changes
-                    sh 'git diff k8s/base/'
-                }
-            }
-        }
-        
-        stage('Deploy to EKS') {
-            when {
-                expression { !params.DRY_RUN }
-            }
-            steps {
-                script {
-                    def namespace = params.ENVIRONMENT == 'production' ? 'production' : 'staging'
-                    
+                    echo "Updating image tags in manifests..."
                     sh """
-                        # Create namespace if not exists
-                        kubectl create namespace ${namespace} --dry-run=client -o yaml | kubectl apply -f -
-                        
-                        # Apply ConfigMaps and Secrets
-                        kubectl apply -f k8s/base/configmap-*.yaml -n ${namespace}
-                        kubectl apply -f k8s/base/secret-db.yaml -n ${namespace}
-                        
-                        # Apply deployments
-                        kubectl apply -f k8s/base/deployment-api-gateway.yaml -n ${namespace}
-                        kubectl apply -f k8s/base/deployment-product-service.yaml -n ${namespace}
-                        kubectl apply -f k8s/base/deployment-order-service.yaml -n ${namespace}
-                        
-                        # Apply HPA
-                        kubectl apply -f k8s/base/hpa.yaml -n ${namespace}
+                        cd ${K8S_MANIFESTS_PATH}
+                        sed -i 's|your-dockerhub-username|${DOCKERHUB_USERNAME}|g' *.yaml
+                        sed -i 's|:latest|:${params.IMAGE_TAG}|g' deployment-*.yaml
+                        cd ../..
                     """
-                    
-                    // Apply Ingress only for production
-                    if (params.ENVIRONMENT == 'production') {
-                        sh 'kubectl apply -f k8s/base/ingress.yaml -n ${namespace}'
-                    }
                 }
             }
         }
         
-        stage('Verify Rollout') {
-            when {
-                expression { !params.DRY_RUN }
-            }
+        stage('Apply ConfigMaps and Secrets') {
             steps {
                 script {
-                    def namespace = params.ENVIRONMENT == 'production' ? 'production' : 'staging'
-                    def timeout = 300 // 5 minutes
-                    
-                    SERVICES.split(' ').each { service ->
-                        echo "Verifying rollout for ${service}..."
-                        sh """
-                            kubectl rollout status deployment/${service} -n ${namespace} --timeout=${timeout}s
-                        """
-                    }
-                    
-                    // Check pod status
+                    echo "Applying ConfigMaps and Secrets..."
                     sh """
-                        echo "=== Pod Status ==="
-                        kubectl get pods -n ${namespace}
-                        
-                        echo "=== Service Status ==="
-                        kubectl get svc -n ${namespace}
+                        kubectl apply -f ${K8S_MANIFESTS_PATH}/configmap-*.yaml -n ${NAMESPACE}
+                        kubectl apply -f ${K8S_MANIFESTS_PATH}/secret-*.yaml -n ${NAMESPACE}
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy PostgreSQL') {
+            steps {
+                script {
+                    echo "Deploying PostgreSQL..."
+                    sh """
+                        kubectl apply -f ${K8S_MANIFESTS_PATH}/deployment-postgres.yaml -n ${NAMESPACE}
+                        kubectl rollout status deployment/postgres -n ${NAMESPACE} --timeout=120s
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy Backend Services') {
+            steps {
+                script {
+                    echo "Deploying backend services..."
+                    sh """
+                        kubectl apply -f ${K8S_MANIFESTS_PATH}/deployment-product-service.yaml -n ${NAMESPACE}
+                        kubectl apply -f ${K8S_MANIFESTS_PATH}/deployment-order-service.yaml -n ${NAMESPACE}
+                        kubectl apply -f ${K8S_MANIFESTS_PATH}/deployment-user-service.yaml -n ${NAMESPACE}
+                        kubectl apply -f ${K8S_MANIFESTS_PATH}/deployment-api-gateway.yaml -n ${NAMESPACE}
+                    """
+                }
+            }
+        }
+        
+        stage('Wait for Backend Services') {
+            steps {
+                script {
+                    echo "Waiting for backend services to be ready..."
+                    sh """
+                        kubectl rollout status deployment/product-service -n ${NAMESPACE} --timeout=60s
+                        kubectl rollout status deployment/order-service -n ${NAMESPACE} --timeout=60s
+                        kubectl rollout status deployment/user-service -n ${NAMESPACE} --timeout=60s
+                        kubectl rollout status deployment/api-gateway -n ${NAMESPACE} --timeout=60s
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy Frontend') {
+            steps {
+                script {
+                    echo "Deploying frontend..."
+                    sh """
+                        kubectl apply -f ${K8S_MANIFESTS_PATH}/deployment-frontend.yaml -n ${NAMESPACE}
+                        kubectl rollout status deployment/frontend -n ${NAMESPACE} --timeout=60s
+                    """
+                }
+            }
+        }
+        
+        stage('Apply Ingress') {
+            steps {
+                script {
+                    echo "Applying Traefik ingress..."
+                    sh """
+                        kubectl apply -f ${K8S_MANIFESTS_PATH}/ingress.yaml -n ${NAMESPACE}
+                    """
+                }
+            }
+        }
+        
+        stage('Verify Deployment') {
+            steps {
+                script {
+                    echo "Verifying deployment..."
+                    sh """
+                        kubectl get pods -n ${NAMESPACE} -o wide
+                        kubectl get services -n ${NAMESPACE}
+                        kubectl get ingress -n ${NAMESPACE}
                     """
                 }
             }
         }
         
         stage('Smoke Tests') {
-            when {
-                expression { !params.DRY_RUN }
-            }
             steps {
                 script {
-                    def namespace = params.ENVIRONMENT == 'production' ? 'production' : 'staging'
-                    def gatewayUrl = params.ENVIRONMENT == 'production' ? 'https://api.yourdomain.com' : 'http://api-gateway-staging.yourdomain.com'
-                    
-                    // Wait for services to be ready
-                    sleep(time: 30, unit: 'SECONDS')
-                    
-                    // Health check
+                    echo "Running smoke tests..."
                     sh """
-                        echo "Testing health endpoints..."
-                        curl -f ${gatewayUrl}/health || exit 1
-                    """
-                    
-                    echo "Smoke tests passed!"
-                }
-            }
-        }
-        
-        stage('Commit Manifests') {
-            when {
-                expression { !params.DRY_RUN && params.ENVIRONMENT == 'production' }
-            }
-            steps {
-                script {
-                    sh """
-                        git config user.email "jenkins@yourdomain.com"
-                        git config user.name "Jenkins"
-                        git add k8s/base/
-                        git commit -m "Update image tags to ${params.IMAGE_TAG} - Build #${BUILD_NUMBER}" || echo "No changes to commit"
-                        git push origin main
+                        # Get node IP
+                        NODE_IP=\$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[0].address}')
+                        
+                        # Test health endpoints
+                        sleep 10
+                        curl -f http://\$NODE_IP/api/products || echo "Products endpoint check failed"
+                        curl -f http://\$NODE_IP/ || echo "Frontend check failed"
                     """
                 }
             }
@@ -163,24 +172,12 @@ pipeline {
             cleanWs()
         }
         success {
-            echo "Deployment to ${params.ENVIRONMENT} completed successfully!"
-            slackSend color: 'good', message: "CD SUCCESS: E-Commerce deployed to ${params.ENVIRONMENT} - Build #${BUILD_NUMBER}"
+            echo 'CD Pipeline completed successfully!'
+            echo "Deployment to ${NAMESPACE} completed with image tag: ${params.IMAGE_TAG}"
         }
         failure {
-            echo 'Deployment failed! Initiating rollback...'
-            script {
-                if (!params.DRY_RUN) {
-                    def namespace = params.ENVIRONMENT == 'production' ? 'production' : 'staging'
-                    
-                    SERVICES.split(' ').each { service ->
-                        sh """
-                            echo "Rolling back ${service}..."
-                            kubectl rollout undo deployment/${service} -n ${namespace}
-                        """
-                    }
-                }
-            }
-            slackSend color: 'danger', message: "CD FAILED: E-Commerce deployment to ${params.ENVIRONMENT} failed - Build #${BUILD_NUMBER}. Rollback initiated."
+            echo 'CD Pipeline failed!'
+            sh 'kubectl describe pods -n ${NAMESPACE} || true'
         }
     }
 }

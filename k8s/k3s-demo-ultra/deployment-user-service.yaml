@@ -5,7 +5,7 @@ metadata:
   labels:
     app: user-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: user-service
@@ -23,23 +23,46 @@ spec:
             - configMapRef:
                 name: user-service-config
             - secretRef:
+                name: db-credentials
+            - secretRef:
                 name: user-service-credentials
+          env:
+            - name: DB_HOST
+              value: postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: users_db
+            - name: DB_USER
+              value: postgres
           resources:
             requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
               memory: "128Mi"
               cpu: "100m"
-            limits:
-              memory: "256Mi"
-              cpu: "200m"
           livenessProbe:
             httpGet:
               path: /health
               port: 3003
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 10
+            periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /health
               port: 3003
             initialDelaySeconds: 5
-            periodSeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+spec:
+  selector:
+    app: user-service
+  ports:
+    - port: 3003
+      targetPort: 3003
+  type: ClusterIP

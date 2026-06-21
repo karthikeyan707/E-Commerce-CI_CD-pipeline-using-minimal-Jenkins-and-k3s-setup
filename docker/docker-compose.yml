@@ -150,10 +150,10 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://54.202.105.53:3000
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
     container_name: ecommerce-frontend
     environment:
-      VITE_API_URL: http://54.202.105.53:3000
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
     ports:
       - "80:80"
     depends_on:

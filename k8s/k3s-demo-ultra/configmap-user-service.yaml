@@ -4,7 +4,4 @@ metadata:
   name: user-service-config
 data:
   PORT: "3003"
-  DB_HOST: "postgres"
-  DB_PORT: "5432"
-  DB_NAME: "users_db"
-  NODE_ENV: "production"
+  NODE_ENV: production

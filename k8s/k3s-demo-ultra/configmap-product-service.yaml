@@ -4,7 +4,4 @@ metadata:
   name: product-service-config
 data:
   PORT: "3001"
-  DB_HOST: "postgres"
-  DB_PORT: "5432"
-  DB_NAME: "products_db"
-  NODE_ENV: "production"
+  NODE_ENV: production

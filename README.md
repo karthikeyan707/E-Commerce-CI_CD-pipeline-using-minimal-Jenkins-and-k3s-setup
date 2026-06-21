@@ -1,36 +1,42 @@
 # E-Commerce CI/CD Project
 
-A production-grade microservices-based E-Commerce system with complete CI/CD pipeline on AWS EKS. Features a React frontend, JWT authentication, and 5 products with shopping cart functionality.
+A microservices-based E-Commerce system with complete CI/CD pipeline on k3s (lightweight Kubernetes). Features a React frontend, JWT authentication, and 5 products with shopping cart functionality. Optimized for AWS Free Tier t3.small instances with Jenkins master/slave, SonarQube, Nexus, and Trivy.
 
 ## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
+│                      Jenkins Master/Slave (CI/CD)                    │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────┐│
+│  │  SonarQube   │  │    Nexus     │  │    Trivy     │  │ Docker  ││
+│  │  (Code Qaul) │  │  (Artifacts) │  │  (Security)  │  │ (Build) ││
+│  └──────────────┘  └──────────────┘  └──────────────┘  └─────────┘│
+└───────────────────────────────────┬─────────────────────────────────┘
+                                    │
+┌───────────────────────────────────▼─────────────────────────────────┐
 │                           React Frontend (Port 80)                   │
 │                    SPA - Products, Cart, Orders, Auth                │
 └───────────────────────────────────┬─────────────────────────────────┘
                                     │
 ┌───────────────────────────────────▼─────────────────────────────────┐
-│                              AWS EKS                                │
+│                              k3s Cluster                            │
 │  ┌───────────────────────────────────────────────────────────────┐   │
-│  │                     Ingress (ALB)                          │   │
+│  │                     Traefik Ingress                          │   │
 │  └───────────────────────┬───────────────────────────────────┘   │
 │                          │                                        │
 │  ┌───────────────────────▼───────────────────────────────────┐     │
-│  │                API Gateway (2 replicas)                  │     │
+│  │                API Gateway (1 replica)                  │     │
 │  │             Port: 3000, Rate Limiting                  │     │
 │  └───────────────┬───────────────────────┬──────────────────┘     │
 │                  │                       │                          │
 │      ┌───────────▼──────────┐  ┌────────▼──────────┐  ┌───────────┐│
 │      │   Product Service    │  │  Order Service  │  │User Service│
-│      │   (3 replicas)       │  │  (3 replicas)   │  │(2 replicas)│
+│      │   (1 replica)       │  │  (1 replica)   │  │(1 replica)│
 │      │   Port: 3001         │  │  Port: 3002     │  │Port: 3003  │
 │      └───────────┬──────────┘  └────────┬──────────┘  └─────┬─────┘│
 │                  │                     │                   │      │
 │      ┌───────────▼─────────────────────▼───────────────────▼────┐│
-│      │           PostgreSQL StatefulSet (Multi-AZ)              ││
-│      │           Primary: postgres-0  (AZ-1)                    ││
-│      │           Replica: postgres-1   (AZ-2)                   ││
+│      │           PostgreSQL Deployment (1 replica)              ││
 │      │           Databases: products_db, orders_db, users_db      ││
 │      └──────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────┘
@@ -82,65 +88,136 @@ E_Commerce-CICD/
 ├── order-service/        # Order Service (linked to users)
 ├── user-service/         # JWT Authentication service
 ├── k8s/                  # Kubernetes manifests
-│   └── base/
-│       ├── deployment-*.yaml      # All service deployments
-│       ├── service-*.yaml         # All service definitions
+│   └── k3s-demo-ultra/   # Ultra-optimized k3s manifests (t3.small)
+│       ├── deployment-*.yaml      # Optimized deployments (1 replica)
 │       ├── configmap-*.yaml       # Service configurations
 │       ├── secret-*.yaml          # Database credentials
-│       └── statefulset-postgres.yaml  # PostgreSQL HA
+│       ├── ingress.yaml          # Traefik ingress
+│       └── kustomization.yaml    # Kustomize config
 ├── jenkins/
-│   ├── Jenkinsfile-CI   # GitHub webhook trigger, manual approval
-│   └── Jenkinsfile-CD   # Deployment pipeline
+│   ├── Jenkinsfile-CI   # CI pipeline (build, test, SonarQube, Trivy, Nexus)
+│   └── Jenkinsfile-CD   # CD pipeline (k3s deployment)
 ├── docker/
-│   └── docker-compose.yml   # Full local stack with frontend
+│   ├── docker-compose.yml       # Full local stack with frontend
+│   └── docker-compose.build.yml # Build all images
 └── scripts/
-    ├── build-images.sh
-    └── push-images.sh
+    ├── setup-jenkins-master-slave.sh  # Jenkins master/slave setup
+    ├── setup-sonarqube.sh              # SonarQube setup
+    ├── setup-nexus.sh                  # Nexus setup
+    ├── setup-trivy.sh                  # Trivy setup
+    ├── setup-rds.sh                    # RDS Multi-AZ setup (optional)
+    ├── build-images.sh                 # Build Docker images
+    ├── push-images.sh                  # Push to DockerHub
+    └── deploy-k3s.sh                   # Deploy to k3s
 ```
 
 ## Prerequisites
 
-- AWS CLI v2+
+### For k3s Deployment (t3.small)
+- AWS EC2 t3.small instance (1 vCPU, 2GB RAM) or equivalent
 - kubectl v1.28+
-- eksctl v0.160+
 - Docker v24+
 - Node.js 18+
-- Helm v3+
+- curl
+- DockerHub account
+
+### For Local Development
+- Docker v24+
+- Node.js 18+
+- npm
 
 ## Quick Start
 
-### 1. Infrastructure Setup
+### 1. Infrastructure Setup (k3s on t3.small)
 
-#### 1.1 Create EKS Cluster
+**Resource Requirements:** AWS EC2 t3.small instance (1 vCPU, 2GB RAM)
+
+#### 1.1 Launch EC2 Instance with User Data
+
+Use the following User Data script when launching your EC2 instance:
+
 ```bash
-chmod +x scripts/setup-eks.sh
-./scripts/setup-eks.sh
+#!/bin/bash
+# Update system
+apt-get update -y
+
+# Install Docker
+curl -fsSL https://get.docker.com | sh
+usermod -aG docker ubuntu
+
+# Install k3s
+curl -sfL https://get.k3s.io | sh -
+
+# Wait for k3s to start
+sleep 30
+
+# Install kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x kubectl
+mv kubectl /usr/local/bin/
+
+# Install Node.js 18
+curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+apt-get install -y nodejs
+
+# Clone repository
+cd /home/ubuntu
+git clone https://github.com/karthikeyan707/E-Commerce-CI_CD-pipeline-using-minimal-Jenkins-and-k3s-setup.git
+cd E-Commerce-CI_CD-pipeline-using-minimal-Jenkins-and-k3s-setup
+
+# Setup Jenkins master/slave
+chmod +x scripts/setup-jenkins-master-slave.sh
+./scripts/setup-jenkins-master-slave.sh
 ```
 
-#### 1.2 Deploy PostgreSQL StatefulSet (Multi-AZ in EKS)
-```bash
-# Create StorageClass for EBS gp3 encrypted volumes
-kubectl apply -f k8s/base/storageclass-postgres.yaml
+#### 1.2 Access Jenkins
 
-# Deploy PostgreSQL with streaming replication across AZs
-kubectl apply -f k8s/base/configmap-postgres.yaml
-kubectl apply -f k8s/base/secret-postgres.yaml
-kubectl apply -f k8s/base/service-postgres.yaml
-kubectl apply -f k8s/base/statefulset-postgres.yaml
+```bash
+# Get EC2 public IP
+INSTANCE_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+
+# Access Jenkins at: http://$INSTANCE_IP:8080
+
+# Get initial admin password
+docker exec jenkins-master cat /var/jenkins_home/secrets/initialAdminPassword
 ```
 
-**Note:** For production, consider using AWS RDS Multi-AZ instead:
-```bash
-chmod +x scripts/setup-rds.sh
-./scripts/setup-rds.sh
-```
+#### 1.3 Configure Jenkins
 
-#### 1.3 Setup DevOps Tools
-```bash
-# Jenkins
-chmod +x scripts/setup-jenkins.sh
-./scripts/setup-jenkins.sh
+1. Complete Jenkins initial setup wizard
+2. Install required plugins:
+   - Pipeline
+   - Git
+   - Docker Pipeline
+   - Kubernetes CLI
+   - SonarQube Scanner
 
+3. Configure credentials:
+   - `dockerhub-credentials` - DockerHub username/password
+   - `sonarqube-token` - SonarQube authentication token
+   - `nexus-credentials` - Nexus username/password
+
+4. Configure Jenkins agent:
+   - Manage Jenkins → Manage Nodes → New Node
+   - Name: `jenkins-slave`
+   - Launch method: Launch agent by connecting it to the controller
+
+5. Create CI Pipeline:
+   - New Item → Pipeline
+   - Name: `ecommerce-ci`
+   - Pipeline script from SCM
+   - Repository URL: your GitHub repo
+   - Script Path: `jenkins/Jenkinsfile-CI`
+
+6. Create CD Pipeline:
+   - New Item → Pipeline
+   - Name: `ecommerce-cd`
+   - Pipeline script from SCM
+   - Script Path: `jenkins/Jenkinsfile-CD`
+
+#### 1.4 Setup DevOps Tools (Optional)
+
+```bash
 # SonarQube
 chmod +x scripts/setup-sonarqube.sh
 ./scripts/setup-sonarqube.sh
@@ -153,6 +230,49 @@ chmod +x scripts/setup-nexus.sh
 chmod +x scripts/setup-trivy.sh
 ./scripts/setup-trivy.sh
 ```
+
+#### 1.5 Deploy to k3s
+
+**Option 1: Using Jenkins Pipeline (Recommended)**
+1. Update `DOCKERHUB_USERNAME` in `jenkins/Jenkinsfile-CI`
+2. Trigger Jenkins CI pipeline
+3. Approve deployment in Jenkins
+4. CD pipeline will deploy to k3s automatically
+
+**Option 2: Manual Deployment**
+```bash
+# Update image tags in manifests
+cd k8s/k3s-demo-ultra
+sed -i 's|your-dockerhub-username|your-dockerhub-username|g' *.yaml
+cd ../..
+
+# Deploy all manifests
+kubectl apply -k k8s/k3s-demo-ultra
+
+# Wait for all resources to be ready
+kubectl rollout status deployment/postgres --timeout=120s
+kubectl rollout status deployment/product-service --timeout=60s
+kubectl rollout status deployment/order-service --timeout=60s
+kubectl rollout status deployment/user-service --timeout=60s
+kubectl rollout status deployment/api-gateway --timeout=60s
+kubectl rollout status deployment/frontend --timeout=60s
+```
+
+#### 1.6 Access the Application
+```bash
+# Get the node IP
+kubectl get nodes -o wide
+
+# Access via:
+# Frontend: http://<NODE-IP>/
+# API: http://<NODE-IP>/api/
+# Traefik Dashboard: http://<NODE-IP>:8080/
+```
+
+**Resource Usage (k3s on t3.small):**
+- Total RAM: ~800MB (vs 2GB available)
+- Total CPU: ~0.4 cores (vs 1 core available)
+- Cost: ~$10-15/month (AWS Free Tier)
 
 ### 2. Local Development
 
@@ -493,38 +613,43 @@ CREATE TABLE order_items (
 ### CI Pipeline (Jenkinsfile-CI)
 1. **Trigger** - GitHub webhook on push
 2. **Checkout** - Clone repository
-3. **Build** - Install dependencies
+3. **Build** - Install dependencies (npm ci)
 4. **Unit Tests** - Run test suites with coverage
 5. **SonarQube Analysis** - Code quality scan
 6. **Quality Gate** - Enforce quality standards
-7. **Docker Build** - Build container images
+7. **Docker Build** - Build container images using docker-compose
 8. **Trivy Scan** - Security vulnerability scan
 9. **Push to DockerHub** - Publish images
 10. **Upload to Nexus** - Archive artifacts
-11. **Manual Approval** - Approve deployment
+11. **Manual Approval** - Approve deployment (production/staging)
 12. **Trigger CD** - Start deployment pipeline
 
 ### CD Pipeline (Jenkinsfile-CD)
-1. **Checkout K8s Manifests** - Pull Kubernetes configs
-2. **Configure AWS** - Setup EKS access
-3. **Update Image Tags** - Update deployment manifests
-4. **Deploy to EKS** - Apply to Kubernetes
-5. **Verify Rollout** - Check deployment status
-6. **Smoke Tests** - Run health checks
-7. **Commit Manifests** - GitOps update
+1. **Checkout** - Clone repository
+2. **Configure kubectl** - Verify k3s cluster connection
+3. **Create Namespace** - Create deployment namespace
+4. **Update Image Tags** - Update deployment manifests
+5. **Apply ConfigMaps/Secrets** - Apply Kubernetes configurations
+6. **Deploy PostgreSQL** - Deploy database
+7. **Deploy Backend Services** - Deploy microservices
+8. **Wait for Services** - Verify services are ready
+9. **Deploy Frontend** - Deploy React frontend
+10. **Apply Ingress** - Configure Traefik ingress
+11. **Verify Deployment** - Check deployment status
+12. **Smoke Tests** - Run health checks
 
 ## Production Checklist
 
-- [ ] Update all placeholder values in YAML files
-- [ ] Configure proper resource limits (CPU/Memory)
-- [ ] Set up SSL certificates for Ingress
+- [ ] Update `DOCKERHUB_USERNAME` in Jenkinsfiles and manifests
+- [ ] Configure proper resource limits (CPU/Memory) in k8s manifests
 - [ ] Configure proper database passwords in Secrets
-- [ ] Set up backup for RDS databases
-- [ ] Configure CloudWatch monitoring
-- [ ] Set up alerting (Slack/Email)
-- [ ] Enable deletion protection on RDS
-- [ ] Configure WAF rules for ALB
-- [ ] Set up VPC Flow Logs
+- [ ] Set up SonarQube projects and quality gates
+- [ ] Configure Nexus repositories
+- [ ] Set up Jenkins credentials (DockerHub, SonarQube, Nexus)
+- [ ] Configure Jenkins agent (jenkins-slave)
+- [ ] Set up GitHub webhook for Jenkins
+- [ ] Configure backup for PostgreSQL data
+- [ ] Set up monitoring and alerting
 
 ## Troubleshooting
 
@@ -532,44 +657,57 @@ CREATE TABLE order_items (
 
 **Pod not starting**
 ```bash
-kubectl describe pod <pod-name> -n production
-kubectl logs <pod-name> -n production --previous
+kubectl describe pod <pod-name>
+kubectl logs <pod-name> --previous
 ```
 
 **Database connection failed**
-- Verify RDS security group allows EKS node access
+- Check PostgreSQL pod status: `kubectl get pods -l app=postgres`
 - Check DB credentials in Kubernetes Secret
-- Ensure DB subnet group is correctly configured
+- Verify PostgreSQL is ready: `kubectl exec -it postgres -- pg_isready -U postgres`
 
 **Ingress not working**
 ```bash
-kubectl get ingress -n production
-kubectl describe ingress api-gateway-ingress -n production
+kubectl get ingress
+kubectl describe ingress ecommerce-ingress
+# Check Traefik dashboard: http://<NODE-IP>:8080
 ```
 
-**HPA not scaling**
-```bash
-kubectl describe hpa api-gateway-hpa -n production
-kubectl top pods -n production
-```
+**Jenkins agent not connecting**
+- Check Jenkins agent status in Jenkins UI
+- Verify agent label matches Jenkinsfile: `jenkins-slave`
+- Check agent logs: `docker logs jenkins-agent`
+
+**Docker build fails**
+- Verify Docker is running: `docker ps`
+- Check disk space: `df -h`
+- Verify docker-compose.build.yml has all services
 
 ## Security Best Practices
 
-1. **Never commit secrets** - Use Kubernetes Secrets or AWS Secrets Manager
+1. **Never commit secrets** - Use Kubernetes Secrets
 2. **Non-root containers** - All services run as non-root user
 3. **Network policies** - Restrict pod-to-pod communication
 4. **Image scanning** - Trivy scans all images before deployment
-5. **RBAC** - Use least-privilege IAM roles
-6. **Encryption** - RDS encryption at rest and in transit
-7. **Private subnets** - EKS nodes in private subnets
-8. **Security groups** - Restrict access to necessary ports only
+5. **RBAC** - Use least-privilege Kubernetes roles
+6. **Encryption** - Use TLS for ingress (configure Traefik)
+7. **Security groups** - Restrict EC2 security group to necessary ports only
+8. **Update regularly** - Keep k3s, Docker, and dependencies updated
 
 ## Monitoring & Logging
 
-### CloudWatch Integration
+### k3s Built-in Monitoring
 ```bash
-# Fluent Bit for log aggregation
-kubectl apply -f https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/fluent-bit/fluent-bit.yaml
+# View pod logs
+kubectl logs -f deployment/api-gateway
+kubectl logs -f deployment/product-service
+
+# View resource usage
+kubectl top pods
+kubectl top nodes
+
+# View events
+kubectl get events --sort-by=.metadata.creationTimestamp
 ```
 
 ### Prometheus & Grafana (Optional)

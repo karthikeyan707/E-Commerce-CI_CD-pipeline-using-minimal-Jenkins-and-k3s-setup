@@ -1,0 +1,49 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: default
+
+resources:
+  # ConfigMaps
+  - configmap-postgres.yaml
+  - configmap-product-service.yaml
+  - configmap-order-service.yaml
+  - configmap-user-service.yaml
+  - configmap-api-gateway.yaml
+  
+  # Secrets
+  - secret-postgres.yaml
+  - secret-db.yaml
+  - secret-user-service.yaml
+  
+  # PostgreSQL (1 replica for ultra-low resources)
+  - deployment-postgres.yaml
+  
+  # Backend Services (1 replica each, minimal resources)
+  - deployment-product-service.yaml
+  - deployment-order-service.yaml
+  - deployment-user-service.yaml
+  - deployment-api-gateway.yaml
+  
+  # Frontend
+  - deployment-frontend.yaml
+  
+  # Ingress
+  - ingress.yaml
+
+images:
+  - name: your-dockerhub-username/product-service
+    newName: your-dockerhub-username/product-service
+    newTag: latest
+  - name: your-dockerhub-username/order-service
+    newName: your-dockerhub-username/order-service
+    newTag: latest
+  - name: your-dockerhub-username/user-service
+    newName: your-dockerhub-username/user-service
+    newTag: latest
+  - name: your-dockerhub-username/api-gateway
+    newName: your-dockerhub-username/api-gateway
+    newTag: latest
+  - name: your-dockerhub-username/frontend
+    newName: your-dockerhub-username/frontend
+    newTag: latest
