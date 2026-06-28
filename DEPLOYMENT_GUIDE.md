@@ -29,7 +29,8 @@ This guide provides step-by-step instructions to deploy the complete E-Commerce 
    - Security Group: Create new with rules:
      - SSH (22): Your IP
      - HTTP (80): 0.0.0.0/0
-     - Custom TCP (8080): 0.0.0.0/0 (Jenkins)
+     - Custom TCP (8088): 0.0.0.0/0 (Jenkins)
+     - Custom TCP (50000): 0.0.0.0/0 (Jenkins agent)
      - Custom TCP (9000): 0.0.0.0/0 (SonarQube)
      - Custom TCP (8081): 0.0.0.0/0 (Nexus)
 
@@ -106,8 +107,7 @@ docker ps | grep jenkins
 ```
 
 Expected output:
-- `jenkins-master` container running
-- `jenkins-agent` container running
+- `jenkins-master` container running (on port 8088)
 
 ### Step 2.4: Get Jenkins Initial Password
 
@@ -123,7 +123,7 @@ Note this password for Jenkins setup.
 
 ### Step 3.1: Access Jenkins UI
 
-1. Open browser: `http://<EC2-PUBLIC-IP>:8080`
+1. Open browser: `http://<EC2-PUBLIC-IP>:8088`
 2. Enter initial admin password from Step 2.4
 3. Click "Install suggested plugins"
 4. Wait for plugin installation
@@ -133,17 +133,20 @@ Note this password for Jenkins setup.
    - Full name: `Jenkins Admin`
    - Email: `admin@example.com`
 6. Save and continue
-7. Configure Jenkins URL: `http://<EC2-PUBLIC-IP>:8080`
+7. Configure Jenkins URL: `http://<EC2-PUBLIC-IP>:8088`
 8. Save and finish
 
 ### Step 3.2: Install Additional Plugins
 
 1. Go to "Manage Jenkins" → "Plugins" → "Available plugins"
 2. Install these plugins:
+   - Pipeline (usually installed by default)
+   - Git (usually installed by default)
    - Docker Pipeline
    - Kubernetes CLI
    - SonarQube Scanner
    - GitHub Integration
+   - SSH Agent
 3. Restart Jenkins after installation
 
 ---
@@ -223,18 +226,17 @@ trivy --version
 
 ## Phase 6: Configure Jenkins Agent
 
-### Step 6.1: Verify Agent Connection
+### Step 6.1: Configure Jenkins Agent
 
-1. In Jenkins UI, go to "Manage Jenkins" → "Nodes"
-2. You should see `jenkins-slave` listed
-3. Click on `jenkins-slave` to verify it's connected
-4. Status should show "Online"
-
-If agent is not online:
-```bash
-docker logs jenkins-agent
-docker restart jenkins-agent
-```
+1. In Jenkins UI, go to "Manage Jenkins" → "Manage Nodes" → "New Node"
+2. Name: `jenkins-slave`
+3. Type: Permanent Agent
+4. Remote root directory: `/home/jenkins/agent`
+5. Launch method: Launch agents via SSH
+6. Host: Your server IP (or `localhost` if running on same machine)
+7. Credentials: Add SSH credentials for the host machine
+8. Click "Save"
+9. Verify agent shows "Online" status
 
 ---
 

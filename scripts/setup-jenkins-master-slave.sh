@@ -58,7 +58,7 @@ echo "Creating Jenkins master container..."
 docker run -d \
   --name jenkins-master \
   --restart unless-stopped \
-  -p 8080:8080 \
+  -p 8088:8080 \
   -p 50000:50000 \
   -v jenkins_home:/var/jenkins_home \
   -v /var/run/docker.sock:/var/run/docker.sock \
@@ -77,11 +77,11 @@ echo "=========================================="
 # Try to get public IP (works on EC2)
 if curl -s --connect-timeout 2 http://169.254.169.254/latest/meta-data/public-ipv4 > /dev/null 2>&1; then
     PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-    echo "Access Jenkins at: http://${PUBLIC_IP}:8080"
+    echo "Access Jenkins at: http://${PUBLIC_IP}:8088"
 else
     # Fallback for non-EC2 environments
     PUBLIC_IP=$(hostname -I | awk '{print $1}')
-    echo "Access Jenkins at: http://${PUBLIC_IP}:8080"
+    echo "Access Jenkins at: http://${PUBLIC_IP}:8088"
     echo "Note: If running on EC2, use the public IP from AWS console"
 fi
 
@@ -92,7 +92,7 @@ echo ""
 echo "=========================================="
 echo "Next Steps:"
 echo "=========================================="
-echo "1. Access Jenkins UI http://<YOUR-IP>:8080 and complete initial setup"
+echo "1. Access Jenkins UI http://<YOUR-IP>:8088 and complete initial setup"
 echo "2. Install required plugins:"
 echo "   - Pipeline"
 echo "   - Git"
