@@ -32,7 +32,7 @@ pipeline {
                     SERVICES.split(' ').each { service ->
                         dir(service) {
                             echo "Building ${service}..."
-                            sh 'npm ci'
+                            sh 'npm install'
                         }
                     }
                 }
