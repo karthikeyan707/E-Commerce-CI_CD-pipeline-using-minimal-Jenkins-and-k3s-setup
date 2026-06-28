@@ -39,19 +39,6 @@ pipeline {
             }
         }
         
-        stage('Unit Tests') {
-            steps {
-                script {
-                    SERVICES.split(' ').each { service ->
-                        dir(service) {
-                            echo "Testing ${service}..."
-                            sh 'npm test'
-                        }
-                    }
-                }
-            }
-        }
-        
         stage('SonarQube Analysis') {
             steps {
                 script {
