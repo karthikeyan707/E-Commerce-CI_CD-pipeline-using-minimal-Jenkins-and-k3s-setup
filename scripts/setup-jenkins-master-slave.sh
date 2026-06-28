@@ -28,7 +28,11 @@ else
     echo "k3s is already installed"
 fi
 
+# Install Java (required for Jenkins agent)
+echo "Installing Java 21..."
 apt-get install -y fontconfig openjdk-21-jre
+echo "Java 21 installed successfully"
+
 
 # Wait for k3s to be ready
 echo "Waiting for k3s to be ready..."

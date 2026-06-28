@@ -233,9 +233,36 @@ trivy --version
 
 ---
 
+## Phase 5.4: Configure SonarQube and Nexus in Jenkins
+
+### Step 5.4.1: Configure SonarQube Server
+
+1. In Jenkins UI, go to **Manage Jenkins** → **Configure System**
+2. Scroll to **SonarQube servers** → Click **Add SonarQube**
+   - Name: `SonarQube`
+   - Server URL: `http://<EC2-PUBLIC-IP>:9000`
+   - Server authentication token: Select `sonarqube-token` (created in Step 4.2)
+3. Click **Save**
+
+### Step 5.4.2: Configure SonarQube Scanner Tool
+
+1. Go to **Manage Jenkins** → **Global Tools**
+2. Find **SonarQube Scanner** → Click **Add SonarQube Scanner**
+   - Name: `SonarQube Scanner`
+   - Check **Install automatically**
+3. Click **Save**
+
+### Step 5.4.3: Verify Nexus Credentials
+
+Nexus is accessed via curl in the pipeline — no server config needed. Just verify the `nexus-credentials` credential exists in **Manage Jenkins** → **Credentials** → **System** → **Global credentials**.
+
+---
+
 ## Phase 6: Configure Jenkins Agent
 
 ### Step 6.1: Configure Jenkins Agent
+
+> **Prerequisite:** Java 21+ must be installed on the agent host. If you ran `setup-jenkins-master-slave.sh`, this is already handled.
 
 1. On the EC2 instance, generate an SSH key for the jenkins user:
    ```bash
@@ -430,27 +457,42 @@ kubectl exec -it postgres-1 -- psql -U postgres -d products_db -c "SELECT * FROM
 
 ---
 
-## Phase 11: Setup GitHub Webhook (Optional)
+## Phase 11: Setup GitHub Webhook (Push → Auto CI → Manual Approval → CD)
 
-### Step 11.1: Configure Jenkins for Webhooks
+This enables the full automated workflow: **push to GitHub → CI pipeline auto-starts → manual approval → CD deploys to k3s**.
 
-1. In Jenkins UI, go to "Manage Jenkins" → "Configure System"
-2. Under "GitHub" section:
-   - Add GitHub Server
-   - API URL: `https://api.github.com`
-   - Credentials: Add GitHub personal access token
-3. Click "Test connection"
-4. Click "Save"
+### Step 11.1: Add GitHub Personal Access Token to Jenkins
+
+1. Go to GitHub → **Settings** → **Developer settings** → **Personal access tokens** → **Tokens (classic)** → **Generate new token**
+   - Name: `Jenkins Webhook`
+   - Scopes: Select `repo` (full control) and `admin:repo_hooks` (webhook management)
+   - Click **Generate token** and copy it
+
+2. In Jenkins UI, go to **Manage Jenkins** → **Credentials** → **System** → **Global credentials** → **Add Credentials**
+   - Kind: `Secret text`
+   - Secret: Paste the GitHub token
+   - ID: `github-token`
+   - Click **Create**
 
 ### Step 11.2: Create Webhook in GitHub
 
-1. Go to your GitHub repository
-2. Settings → Webhooks → "Add webhook"
-3. Payload URL: `http://<EC2-PUBLIC-IP>:8080/github-webhook/`
-4. Content type: `application/json`
-5. Secret: (optional)
-6. Events: Select "Push" events
-7. Click "Add webhook"
+1. Go to your GitHub repository → **Settings** → **Webhooks** → **Add webhook**
+2. Payload URL: `http://<EC2-PUBLIC-IP>:8088/github-webhook/`
+3. Content type: `application/json`
+4. Secret: (leave blank)
+5. Events: Select "Just the push event"
+6. Click **Add webhook**
+
+### Step 11.3: Verify CI Pipeline Auto-Trigger
+
+1. The CI pipeline (`ecommerce-ci`) already has `triggers { githubPush() }` in `Jenkinsfile-CI`
+2. Make a test push to verify the webhook works:
+   ```bash
+   echo "// Webhook test" >> frontend/src/App.jsx
+   git add . && git commit -m "Test webhook trigger" && git push origin main
+   ```
+3. In Jenkins UI, the `ecommerce-ci` job should start automatically within seconds
+4. When CI reaches the **Manual Approval** stage, click the build → **Proceed** → select environment → the CD pipeline will deploy
 
 ---
 
@@ -488,15 +530,16 @@ git push origin main
 
 ### Step 12.3: Approve Deployment
 
-1. When CI pipeline reaches "Manual Approval for CD" stage
-2. Click on the build
-3. Click "Proceed" or input the required parameters
+1. When CI pipeline reaches **"Manual Approval for CD"** stage, the build pauses
+2. Click on the running build in Jenkins (`http://<EC2-PUBLIC-IP>:8088/job/ecommerce-ci/`)
+3. Click **"Proceed"**
 4. Select deployment environment: `production`
-5. Submit approval
+5. Click **"Submit"**
+6. The CI pipeline then triggers the CD pipeline (`ecommerce-cd`) automatically
 
 ### Step 12.4: Monitor CD Pipeline
 
-1. Go to `ecommerce-cd` job
+1. Go to `ecommerce-cd` job at `http://<EC2-PUBLIC-IP>:8088/job/ecommerce-cd/`
 2. Watch the deployment stages:
    - Checkout
    - Configure kubectl
