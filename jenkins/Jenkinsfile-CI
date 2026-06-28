@@ -12,7 +12,7 @@ pipeline {
         SONARQUBE_TOKEN = credentials('sonarqube-token')
         NEXUS_URL = 'http://nexus:8081'
         NEXUS_CREDENTIALS = credentials('nexus-credentials')
-        DOCKERHUB_USERNAME = 'your-dockerhub-username'
+        DOCKERHUB_USERNAME = 'ukarthikeyan'
         SERVICES = 'api-gateway product-service order-service user-service frontend'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
     }

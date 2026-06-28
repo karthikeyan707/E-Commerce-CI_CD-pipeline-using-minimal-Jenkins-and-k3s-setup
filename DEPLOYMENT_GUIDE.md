@@ -212,6 +212,13 @@ chmod +x scripts/setup-nexus.sh
 
 Wait for Nexus to start (3-5 minutes), then access at `http://<EC2-PUBLIC-IP>:8081`
 
+Get the initial admin password:
+```bash
+docker exec nexus cat /nexus-data/admin.password
+```
+
+Login with username `admin` and the password above. You will be prompted to set a new password.
+
 ### Step 5.3: Setup Trivy
 
 ```bash
@@ -248,7 +255,8 @@ trivy --version
    - Type: Permanent Agent
    - Remote root directory: `/home/jenkins/agent`
    - Launch method: "Launch agents via SSH"
-   - Host: `localhost` (or the server IP)
+   - Host: `localhost` (Jenkins runs on host network, so localhost reaches the host directly)
+   - Port: `22`
    - Credentials: Select the `jenkins-ssh-key` credential created above
    - Host Key Verification Strategy: "Non verifying Verification Strategy"
 

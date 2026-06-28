@@ -58,12 +58,12 @@ echo "Creating Jenkins master container..."
 docker run -d \
   --name jenkins-master \
   --restart unless-stopped \
-  -p 8088:8080 \
-  -p 50000:50000 \
+  --network host \
   -v jenkins_home:/var/jenkins_home \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v /home/jenkins/.kube:/home/jenkins/.kube \
   -e DOCKER_HOST=unix:///var/run/docker.sock \
+  -e JENKINS_OPTS="--httpPort=8088" \
   jenkins/jenkins:lts
 
 # Wait for Jenkins to start

@@ -9,7 +9,7 @@ pipeline {
     }
     
     environment {
-        DOCKERHUB_USERNAME = 'your-dockerhub-username'
+        DOCKERHUB_USERNAME = 'ukarthikeyan'
         KUBECONFIG = '/home/jenkins/.kube/config'
         K8S_MANIFESTS_PATH = 'k8s/k3s-demo-ultra'
         NAMESPACE = "${params.DEPLOY_ENVIRONMENT}"
