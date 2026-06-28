@@ -17,10 +17,6 @@ pipeline {
         IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
     
-    tools {
-        nodejs 'NodeJS-20'
-    }
-    
     stages {
         stage('Checkout') {
             steps {
