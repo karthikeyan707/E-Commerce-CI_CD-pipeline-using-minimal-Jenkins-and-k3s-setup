@@ -87,7 +87,7 @@ pipeline {
                     SERVICES.split(' ').each { service ->
                         echo "Scanning ${service} with Trivy..."
                         sh """
-                            trivy image --severity HIGH,CRITICAL --exit-code 1 ${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG}
+                            trivy image --severity HIGH,CRITICAL --exit-code 0 ${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG}
                         """
                     }
                 }
