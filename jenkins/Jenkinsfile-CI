@@ -72,7 +72,7 @@ pipeline {
                     echo "Building all Docker images using docker-compose..."
                     sh """
                         cd docker
-                        IMAGE_TAG=${IMAGE_TAG} DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME} docker-compose -f docker-compose.build.yml build
+                        IMAGE_TAG=${IMAGE_TAG} DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME} docker compose -f docker-compose.build.yml build
                     """
                     
                     echo "Docker images built successfully:"
