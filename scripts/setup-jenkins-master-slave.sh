@@ -70,23 +70,8 @@ docker run -d \
 echo "Waiting for Jenkins to start..."
 sleep 30
 
-# Create Jenkins agent container
-echo "Creating Jenkins agent container..."
-docker run -d \
-  --name jenkins-agent \
-  --restart unless-stopped \
-  --link jenkins-master:jenkins-master \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v /home/jenkins/.kube:/home/jenkins/.kube \
-  -e DOCKER_HOST=unix:///var/run/docker.sock \
-  jenkins/inbound-agent:latest -url http://jenkins-master:8080 jenkins-slave
-
-echo "Waiting for Jenkins agent to start..."
-sleep 15
-
-# Get Jenkins initial admin password
 echo "=========================================="
-echo "Jenkins Master/Slave Setup Complete!"
+echo "Jenkins Master Setup Complete!"
 echo "=========================================="
 
 # Try to get public IP (works on EC2)
@@ -107,14 +92,18 @@ echo ""
 echo "=========================================="
 echo "Next Steps:"
 echo "=========================================="
-echo "1. Access Jenkins UI and complete initial setup"
+echo "1. Access Jenkins UI http://<YOUR-IP>:8080 and complete initial setup"
 echo "2. Install required plugins:"
 echo "   - Pipeline"
 echo "   - Git"
 echo "   - Docker Pipeline"
 echo "   - Kubernetes CLI"
 echo "   - SonarQube Scanner"
-echo "3. Jenkins agent is already running as 'jenkins-agent' container"
+echo "3. Configure Jenkins agent manually in Jenkins UI:"
+echo "   - Manage Jenkins → Manage Nodes → New Node"
+echo "   - Name: jenkins-slave"
+echo "   - Launch method: Launch agents via SSH"
+echo "   - Configure SSH credentials"
 echo "4. Configure credentials:"
 echo "   - dockerhub-credentials"
 echo "   - sonarqube-token"

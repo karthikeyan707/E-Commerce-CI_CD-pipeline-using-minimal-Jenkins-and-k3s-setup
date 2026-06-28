@@ -198,9 +198,11 @@ docker exec jenkins-master cat /var/jenkins_home/secrets/initialAdminPassword
    - `sonarqube-token` - SonarQube authentication token
    - `nexus-credentials` - Nexus username/password
 
-4. **Jenkins agent is already automated** - The setup script creates both master and agent containers
-   - Verify agent is running: `docker ps | grep jenkins-agent`
-   - Agent should appear in Jenkins UI as "jenkins-slave"
+4. **Configure Jenkins agent manually** - The setup script creates only the Jenkins master
+   - In Jenkins UI: Manage Jenkins → Manage Nodes → New Node
+   - Name: `jenkins-slave`
+   - Launch method: Launch agents via SSH
+   - Configure SSH credentials for the host machine
 
 5. Create CI Pipeline:
    - New Item → Pipeline
