@@ -3,8 +3,6 @@ import axios from 'axios';
 
 const AuthContext = createContext();
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
@@ -21,7 +19,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchProfile = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/users/profile`);
+      const response = await axios.get('/api/users/profile');
       setUser(response.data.user);
     } catch (error) {
       logout();
@@ -32,7 +30,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
-      const response = await axios.post(`${API_URL}/api/auth/login`, {
+      const response = await axios.post('/api/auth/login', {
         username,
         password
       });
@@ -52,7 +50,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (username, password) => {
     try {
-      const response = await axios.post(`${API_URL}/api/auth/register`, {
+      const response = await axios.post('/api/auth/register', {
         username,
         password
       });

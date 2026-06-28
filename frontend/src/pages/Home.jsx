@@ -3,8 +3,6 @@ import axios from 'axios';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
 const Home = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,7 +16,7 @@ const Home = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/products`);
+      const response = await axios.get('/api/products');
       setProducts(response.data.products || response.data);
       setLoading(false);
     } catch (err) {
