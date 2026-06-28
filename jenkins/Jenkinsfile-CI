@@ -103,6 +103,7 @@ pipeline {
                         SERVICES.split(' ').each { service ->
                             echo "Pushing ${service} to DockerHub..."
                             sh """
+                                docker tag ${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG} ${DOCKERHUB_USERNAME}/${service}:latest
                                 docker push ${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG}
                                 docker push ${DOCKERHUB_USERNAME}/${service}:latest
                             """
