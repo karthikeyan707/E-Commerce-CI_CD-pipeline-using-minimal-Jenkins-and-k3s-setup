@@ -78,7 +78,7 @@ else
     kubectl apply -f k8s/k3s-demo-ultra/secret-*.yaml
     
     # Deploy PostgreSQL
-    echo "Deploying PostgreSQL (3 replicas for multi-AZ simulation)..."
+    echo "Deploying PostgreSQL..."
     kubectl apply -f k8s/k3s-demo-ultra/statefulset-postgres.yaml
     
     # Wait for PostgreSQL
@@ -141,8 +141,7 @@ echo "  Frontend: http://$NODE_IP/"
 echo "  API: http://$NODE_IP/api/"
 echo "  Traefik Dashboard: http://$NODE_IP:8080/"
 echo ""
-echo "PostgreSQL Failover Demo:"
+echo "PostgreSQL:"
 echo "  Check pods: kubectl get pods -l app=postgres"
-echo "  Simulate failure: kubectl delete pod postgres-0"
-echo "  Watch failover: kubectl get pods -l app=postgres -w"
+echo "  Restart pod: kubectl delete pod postgres-0"
 echo "=========================================="

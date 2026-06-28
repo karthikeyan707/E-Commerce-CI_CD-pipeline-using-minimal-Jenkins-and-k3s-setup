@@ -424,7 +424,7 @@ kubectl get ingress
 ```
 
 Expected output:
-- 3 PostgreSQL pods (postgres-0, postgres-1, postgres-2)
+- 1 PostgreSQL pod (postgres-0)
 - 2 pods each for: product-service, order-service, user-service, api-gateway, frontend
 - All pods should be in "Running" state
 
@@ -464,20 +464,16 @@ curl -X POST http://<NODE-IP>/api/auth/login \
   -d '{"username":"testuser","password":"password123"}'
 ```
 
-### Step 10.3: Test PostgreSQL Failover
+### Step 10.3: Test PostgreSQL
 
 ```bash
-# Check current PostgreSQL pods
+# Check PostgreSQL pod
 kubectl get pods -l app=postgres
 
-# Delete one pod to test failover
-kubectl delete pod postgres-0
-
-# Watch pod recovery
-kubectl get pods -l app=postgres -w
-
-# Verify data persistence
-kubectl exec -it postgres-1 -- psql -U postgres -d products_db -c "SELECT * FROM products;"
+# Verify database and seeded data
+kubectl exec -it postgres-0 -- psql -U postgres -d products_db -c "SELECT name, price FROM products;"
+kubectl exec -it postgres-0 -- psql -U postgres -d users_db -c "\dt"
+kubectl exec -it postgres-0 -- psql -U postgres -d orders_db -c "\dt"
 ```
 
 ---

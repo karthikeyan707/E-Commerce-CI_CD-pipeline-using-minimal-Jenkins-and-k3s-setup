@@ -36,8 +36,7 @@ A microservices-based E-Commerce system with complete CI/CD pipeline on k3s (lig
 │      └───────────┬──────────┘  └────────┬──────────┘  └─────┬─────┘│
 │                  │                     │                   │      │
 │      ┌───────────▼─────────────────────▼───────────────────▼────┐│
-│      │      PostgreSQL StatefulSet (3 replicas, Persistent)      ││
-│      │      Multi-AZ simulation with pod anti-affinity          ││
+│      │      PostgreSQL StatefulSet (1 replica, Persistent)       ││
 │      │      Databases: products_db, orders_db, users_db          ││
 │      └──────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────┘
@@ -272,8 +271,8 @@ kubectl get nodes -o wide
 ```
 
 **Resource Usage (k3s on t3.small):**
-- Total RAM: ~1.2GB (vs 2GB available) - increased due to 3 PostgreSQL replicas
-- Total CPU: ~0.6 cores (vs 1 core available) - increased due to PostgreSQL StatefulSet
+- Total RAM: ~800MB (vs 2GB available)
+- Total CPU: ~0.5 cores (vs 1 core available)
 - Cost: ~$10-15/month (AWS Free Tier)
 - **Note**: PostgreSQL uses persistent storage with 5Gi per replica
 
