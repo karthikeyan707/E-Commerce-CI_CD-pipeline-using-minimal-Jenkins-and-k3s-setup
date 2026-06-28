@@ -203,6 +203,18 @@ chmod +x scripts/setup-sonarqube.sh
 
 Wait for SonarQube to start (2-3 minutes), then access at `http://<EC2-PUBLIC-IP>:9000`
 
+#### Configure SonarQube Webhook (for Jenkins Quality Gate)
+
+1. Log into SonarQube at `http://<EC2-PUBLIC-IP>:9000` (default: `admin`/`admin`)
+2. Go to **Administration** (top gear icon) → **Configuration** → **Webhooks** → **Create**
+3. Configure:
+   - Name: `Jenkins`
+   - URL: `http://<EC2-PUBLIC-IP>:8088/sonarqube-webhook/`
+   - (Secret: leave blank)
+4. Click **Create**
+
+This allows Jenkins `waitForQualityGate` to receive the analysis result instead of timing out.
+
 ### Step 5.2: Setup Nexus
 
 ```bash
@@ -218,6 +230,19 @@ docker exec nexus cat /nexus-data/admin.password
 ```
 
 Login with username `admin` and the password above. You will be prompted to set a new password.
+
+#### Configure Nexus Repository for Pipeline Artifacts
+
+1. In Nexus UI, click the **Settings** gear icon → **Repository** → **Repositories**
+2. Click **Create repository**
+3. Select **raw (hosted)**
+4. Configure:
+   - Name: `ecommerce-artifacts`
+   - Blob store: `default`
+   - (Leave remaining defaults)
+5. Click **Create repository**
+
+The CI pipeline uploads build artifacts (source tarballs) to `http://nexus:8081/repository/ecommerce-artifacts/{service}/{IMAGE_TAG}/` using the `nexus-credentials`.
 
 ### Step 5.3: Setup Trivy
 
