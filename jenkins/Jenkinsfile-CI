@@ -49,9 +49,7 @@ pipeline {
                                     npx sonar-scanner \
                                     -Dsonar.projectKey=ecommerce-${service} \
                                     -Dsonar.projectName="E-Commerce ${service}" \
-                                    -Dsonar.sources=src \
-                                    -Dsonar.tests=tests \
-                                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                                    -Dsonar.sources=src
                                 """
                             }
                         }
