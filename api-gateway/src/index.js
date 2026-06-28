@@ -17,12 +17,13 @@ app.use(helmet());
 app.use(cors());
 app.use(morgan('combined'));
 
-// Rate limiting
+// Rate limiting (skip health check to avoid false alerts)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === '/health',
 });
 app.use(limiter);
 

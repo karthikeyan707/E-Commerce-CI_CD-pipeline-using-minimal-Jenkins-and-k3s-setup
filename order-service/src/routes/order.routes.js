@@ -88,6 +88,13 @@ router.post('/', [
       });
     }
     
+    // Decrement stock for each product
+    for (const item of items) {
+      await axios.patch(`${PRODUCT_SERVICE_URL}/products/${item.productId}/stock`, {
+        quantity: item.quantity
+      });
+    }
+
     // Create order with items
     const order = await Order.create({
       userId,

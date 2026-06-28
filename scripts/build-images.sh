@@ -22,6 +22,8 @@ echo "Tagging images with version: ${VERSION}"
 docker tag ${DOCKERHUB_USERNAME}/api-gateway:latest ${DOCKERHUB_USERNAME}/api-gateway:${VERSION}
 docker tag ${DOCKERHUB_USERNAME}/product-service:latest ${DOCKERHUB_USERNAME}/product-service:${VERSION}
 docker tag ${DOCKERHUB_USERNAME}/order-service:latest ${DOCKERHUB_USERNAME}/order-service:${VERSION}
+docker tag ${DOCKERHUB_USERNAME}/user-service:latest ${DOCKERHUB_USERNAME}/user-service:${VERSION}
+docker tag ${DOCKERHUB_USERNAME}/frontend:latest ${DOCKERHUB_USERNAME}/frontend:${VERSION}
 
 echo ""
 echo "=== Build Complete ==="

@@ -49,7 +49,7 @@ pipeline {
                     SERVICES.split(' ').each { service ->
                         dir(service) {
                             echo "Testing ${service}..."
-                            sh 'npm test || true'
+                            sh 'npm test'
                         }
                     }
                 }
@@ -68,7 +68,7 @@ pipeline {
                                     -Dsonar.projectName="E-Commerce ${service}" \
                                     -Dsonar.sources=src \
                                     -Dsonar.tests=tests \
-                                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info || true
+                                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
                                 """
                             }
                         }
@@ -106,7 +106,7 @@ pipeline {
                     SERVICES.split(' ').each { service ->
                         echo "Scanning ${service} with Trivy..."
                         sh """
-                            trivy image --severity HIGH,CRITICAL --exit-code 0 ${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG} || true
+                            trivy image --severity HIGH,CRITICAL --exit-code 1 ${DOCKERHUB_USERNAME}/${service}:${IMAGE_TAG}
                         """
                     }
                 }

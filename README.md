@@ -157,8 +157,8 @@ curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stabl
 chmod +x kubectl
 mv kubectl /usr/local/bin/
 
-# Install Node.js 18
-curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+# Install Node.js 20 LTS
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt-get install -y nodejs
 
 # Clone repository
@@ -252,7 +252,7 @@ cd ../..
 kubectl apply -k k8s/k3s-demo-ultra
 
 # Wait for all resources to be ready
-kubectl rollout status deployment/postgres --timeout=120s
+kubectl rollout status statefulset/postgres --timeout=120s
 kubectl rollout status deployment/product-service --timeout=60s
 kubectl rollout status deployment/order-service --timeout=60s
 kubectl rollout status deployment/user-service --timeout=60s
@@ -302,6 +302,11 @@ Edit the `.env` files with your database credentials and service URLs.
 #### 2.3 Start Full Stack with Docker Compose (Recommended)
 ```bash
 cd docker
+
+# (Optional) Override default secrets for production use:
+# Create a .env file in the docker/ directory:
+#   echo "JWT_SECRET=your-strong-secret-here" > .env
+
 docker-compose up -d
 
 # Access:
@@ -354,6 +359,8 @@ curl -X POST http://localhost:3000/api/auth/login \
 
 ### 3. Docker Build with Docker Compose
 
+**Note for Vite users:** The frontend's `VITE_API_URL` is a build-time environment variable. When using the Docker build, pass it via `--build-arg` (already configured in `docker-compose.build.yml`). The nginx config handles runtime API routing via reverse proxy, so the frontend container deployed to k8s does not need this variable at runtime (the nginx `try_files` directive serves the SPA and proxies `/api` calls).
+
 #### 3.1 Build All Images at Once
 ```bash
 # Option 1: Using docker-compose build file
@@ -390,7 +397,9 @@ chmod +x scripts/push-images.sh
 
 #### 4.1 Configure kubectl
 ```bash
-aws eks update-kubeconfig --region us-east-1 --name ecommerce-cluster
+# k3s ships with kubectl already configured
+kubectl version --client
+kubectl get nodes
 ```
 
 #### 4.2 Create Namespace
@@ -399,78 +408,93 @@ kubectl create namespace production
 kubectl create namespace staging
 ```
 
-#### 4.3 Apply PostgreSQL StatefulSet
+#### 4.3 Deploy All Manifests (via Kustomize)
 ```bash
-cd k8s/base
+cd k8s/k3s-demo-ultra
 
-# StorageClass (one-time setup)
-kubectl apply -f storageclass-postgres.yaml
+# Deploy everything (StorageClass, ConfigMaps, Secrets, StatefulSet, Deployments, Ingress)
+kubectl apply -k .
 
-# PostgreSQL
-kubectl apply -f configmap-postgres.yaml -n production
-kubectl apply -f secret-postgres.yaml -n production
-kubectl apply -f service-postgres.yaml -n production
-kubectl apply -f statefulset-postgres.yaml -n production
-
-# Verify PostgreSQL is running
-kubectl get pods -l app=postgres -n production
-kubectl get pvc -n production
+# Wait for all resources to be ready
+kubectl rollout status statefulset/postgres --timeout=300s
+kubectl rollout status deployment/product-service --timeout=120s
+kubectl rollout status deployment/order-service --timeout=120s
+kubectl rollout status deployment/user-service --timeout=120s
+kubectl rollout status deployment/api-gateway --timeout=120s
+kubectl rollout status deployment/frontend --timeout=120s
 ```
 
-#### 4.4 Apply Application Configurations
+#### 4.4 Manual Deployment (without Kustomize)
 ```bash
+cd k8s/k3s-demo-ultra
+
+# StorageClass
+kubectl apply -f storageclass.yaml
+
 # ConfigMaps
-kubectl apply -f configmap-api-gateway.yaml -n production
-kubectl apply -f configmap-product-service.yaml -n production
-kubectl apply -f configmap-order-service.yaml -n production
-kubectl apply -f configmap-user-service.yaml -n production
+kubectl apply -f configmap-postgres.yaml
+kubectl apply -f configmap-api-gateway.yaml
+kubectl apply -f configmap-product-service.yaml
+kubectl apply -f configmap-order-service.yaml
+kubectl apply -f configmap-user-service.yaml
 
 # Secrets
-kubectl apply -f secret-db.yaml -n production
-kubectl apply -f secret-user-service.yaml -n production
+kubectl apply -f secret-postgres.yaml
+kubectl apply -f secret-db.yaml
+kubectl apply -f secret-user-service.yaml
 
-# Deployments
-kubectl apply -f deployment-api-gateway.yaml -n production
-kubectl apply -f deployment-product-service.yaml -n production
-kubectl apply -f deployment-order-service.yaml -n production
-kubectl apply -f deployment-user-service.yaml -n production
-kubectl apply -f deployment-frontend.yaml -n production
+# PostgreSQL StatefulSet (includes headless service)
+kubectl apply -f statefulset-postgres.yaml
 
-# Services
-kubectl apply -f service-user-service.yaml -n production
-kubectl apply -f service-frontend.yaml -n production
+# Verify PostgreSQL is running
+kubectl rollout status statefulset/postgres --timeout=300s
 
-# HPA
-kubectl apply -f hpa.yaml -n production
+# Backend Deployments (each includes ClusterIP service inline)
+kubectl apply -f deployment-product-service.yaml
+kubectl apply -f deployment-order-service.yaml
+kubectl apply -f deployment-user-service.yaml
+kubectl apply -f deployment-api-gateway.yaml
 
-# Ingress (Production only)
-kubectl apply -f ingress.yaml -n production
+# Frontend (includes ClusterIP service inline)
+kubectl apply -f deployment-frontend.yaml
+
+# Ingress
+kubectl apply -f ingress.yaml
 ```
 
 #### 4.5 Access the Application
 ```bash
-# Get frontend LoadBalancer URL
-kubectl get svc frontend -n production
+# Get node IP
+kubectl get nodes -o wide
+
+# Frontend: http://<NODE-IP>/
+# API: http://<NODE-IP>/api/
+# Traefik Dashboard: http://<NODE-IP>:8080/
 
 # Or port-forward for local testing
-kubectl port-forward svc/frontend 8080:80 -n production
+kubectl port-forward svc/frontend 8080:80
 # Open http://localhost:8080 in browser
 ```
 
 #### 4.6 Verify Deployment
 ```bash
 # Check pods
-kubectl get pods -n production
+kubectl get pods
 
 # Check services
-kubectl get svc -n production
+kubectl get svc
 
-# Check HPA
-kubectl get hpa -n production
+# Check StatefulSet
+kubectl get statefulset
+
+# Check persistent volumes
+kubectl get pvc
 
 # View logs
-kubectl logs -f deployment/api-gateway -n production
+kubectl logs -f deployment/api-gateway
 ```
+
+**Note:** The ingress uses Traefik (k3s's default ingress controller) with a wildcard host rule. Service URLs are resolved via Kubernetes DNS (e.g. `http://product-service:3001`).
 
 ### 5. CI/CD Pipeline Setup
 

@@ -80,6 +80,24 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Decrement stock (used by order-service after order placement)
+router.patch('/:id/stock', async (req, res) => {
+  try {
+    const product = await Product.findByPk(req.params.id);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    const { quantity } = req.body;
+    if (product.stock < quantity) {
+      return res.status(400).json({ error: 'Insufficient stock' });
+    }
+    await product.update({ stock: product.stock - quantity });
+    res.json(product);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Delete product
 router.delete('/:id', async (req, res) => {
   try {

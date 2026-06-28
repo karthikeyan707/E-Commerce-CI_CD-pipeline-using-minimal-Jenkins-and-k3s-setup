@@ -2,6 +2,8 @@
 
 This guide provides step-by-step instructions to deploy the complete E-Commerce CI/CD pipeline with Jenkins master/slave, SonarQube, Nexus, Trivy, and k3s cluster with persistent PostgreSQL.
 
+> **Important:** Replace all occurrences of the example repository URL (`https://github.com/karthikeyan707/E-Commerce-CI_CD-pipeline-using-minimal-Jenkins-and-k3s-setup.git`) with **your own forked repository URL** throughout this guide.
+
 ## Prerequisites
 
 - AWS Account with EC2 access
@@ -228,15 +230,29 @@ trivy --version
 
 ### Step 6.1: Configure Jenkins Agent
 
-1. In Jenkins UI, go to "Manage Jenkins" → "Manage Nodes" → "New Node"
-2. Name: `jenkins-slave`
-3. Type: Permanent Agent
-4. Remote root directory: `/home/jenkins/agent`
-5. Launch method: Launch agents via SSH
-6. Host: Your server IP (or `localhost` if running on same machine)
-7. Credentials: Add SSH credentials for the host machine
-8. Click "Save"
-9. Verify agent shows "Online" status
+1. On the EC2 instance, generate an SSH key for the jenkins user:
+   ```bash
+   sudo -u jenkins ssh-keygen -t rsa -f /home/jenkins/.ssh/id_rsa -N ""
+   sudo -u jenkins cat /home/jenkins/.ssh/id_rsa.pub >> /home/jenkins/.ssh/authorized_keys
+   sudo chmod 600 /home/jenkins/.ssh/authorized_keys
+   ```
+
+2. In Jenkins UI, go to "Manage Jenkins" → "Credentials" → "System" → "Global credentials" → "Add Credentials"
+   - Kind: "SSH Username with private key"
+   - ID: `jenkins-ssh-key`
+   - Username: `jenkins`
+   - Private Key: "Enter directly" → paste the content of `/home/jenkins/.ssh/id_rsa` (the private key)
+
+3. Go to "Manage Jenkins" → "Manage Nodes" → "New Node"
+   - Name: `jenkins-slave`
+   - Type: Permanent Agent
+   - Remote root directory: `/home/jenkins/agent`
+   - Launch method: "Launch agents via SSH"
+   - Host: `localhost` (or the server IP)
+   - Credentials: Select the `jenkins-ssh-key` credential created above
+   - Host Key Verification Strategy: "Non verifying Verification Strategy"
+
+4. Click "Save", verify agent shows "Online" status
 
 ---
 
@@ -260,9 +276,17 @@ trivy --version
 
 2. Update DockerHub username in Jenkinsfile-CI:
    ```bash
+   # Option A: Edit directly (changes will be overwritten on next git pull)
    nano jenkins/Jenkinsfile-CI
    # Change line 15: DOCKERHUB_USERNAME = 'your-dockerhub-username'
    # To: DOCKERHUB_USERNAME = 'your-actual-dockerhub-username'
+
+   # Option B (Recommended): Use Jenkins environment variable
+   # Instead of editing the file, in Jenkins UI go to:
+   # Pipeline → "Pipeline Syntax" → "Global Variable Reference"
+   # Or simply set the environment variable in Jenkins job configuration:
+   # - Under "Build Environment" or "Pipeline" → "Environment"
+   # - Add: DOCKERHUB_USERNAME = your-actual-dockerhub-username
    ```
 
 3. Click "Save"
@@ -295,9 +319,13 @@ trivy --version
 
 2. Update DockerHub username in Jenkinsfile-CD:
    ```bash
+   # Option A: Edit directly (changes will be overwritten on next git pull)
    nano jenkins/Jenkinsfile-CD
    # Change line 12: DOCKERHUB_USERNAME = 'your-dockerhub-username'
    # To: DOCKERHUB_USERNAME = 'your-actual-dockerhub-username'
+
+   # Option B (Recommended): Use Jenkins environment variable
+   # Same approach as CI pipeline - set DOCKERHUB_USERNAME in job config
    ```
 
 3. Click "Save"
@@ -337,7 +365,7 @@ kubectl get ingress
 
 Expected output:
 - 3 PostgreSQL pods (postgres-0, postgres-1, postgres-2)
-- 1 pod each for: product-service, order-service, user-service, api-gateway, frontend
+- 2 pods each for: product-service, order-service, user-service, api-gateway, frontend
 - All pods should be in "Running" state
 
 ### Step 9.3: Get Node IP

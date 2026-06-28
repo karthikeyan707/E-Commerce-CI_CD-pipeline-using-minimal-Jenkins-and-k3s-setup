@@ -19,6 +19,8 @@ echo "Pushing images..."
 docker push ${DOCKERHUB_USERNAME}/api-gateway:${VERSION}
 docker push ${DOCKERHUB_USERNAME}/product-service:${VERSION}
 docker push ${DOCKERHUB_USERNAME}/order-service:${VERSION}
+docker push ${DOCKERHUB_USERNAME}/user-service:${VERSION}
+docker push ${DOCKERHUB_USERNAME}/frontend:${VERSION}
 
 # Also push latest tags
 if [ "${VERSION}" != "latest" ]; then
@@ -27,6 +29,8 @@ if [ "${VERSION}" != "latest" ]; then
     docker push ${DOCKERHUB_USERNAME}/api-gateway:latest
     docker push ${DOCKERHUB_USERNAME}/product-service:latest
     docker push ${DOCKERHUB_USERNAME}/order-service:latest
+    docker push ${DOCKERHUB_USERNAME}/user-service:latest
+    docker push ${DOCKERHUB_USERNAME}/frontend:latest
 fi
 
 echo ""

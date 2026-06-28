@@ -9,19 +9,9 @@ if ! docker ps &> /dev/null; then
     exit 1
 fi
 
-echo "Pulling SonarQube image..."
+echo "Pulling images..."
+docker pull postgres:15-alpine
 docker pull sonarqube:lts-community
-
-echo "Creating SonarQube container..."
-docker run -d \
-  --name sonarqube \
-  --restart unless-stopped \
-  -p 9000:9000 \
-  -e SONAR_JDBC_URL=jdbc:postgresql://sonar-postgres:5432/sonar \
-  -e SONAR_JDBC_USERNAME=sonar \
-  -e SONAR_JDBC_PASSWORD=sonar \
-  -v sonarqube_data:/opt/sonarqube/data \
-  sonarqube:lts-community
 
 echo "Creating PostgreSQL for SonarQube..."
 docker run -d \
@@ -33,6 +23,21 @@ docker run -d \
   -e POSTGRES_DB=sonar \
   -v sonar_postgres_data:/var/lib/postgresql/data \
   postgres:15-alpine
+
+echo "Waiting for PostgreSQL to be ready..."
+sleep 15
+
+echo "Creating SonarQube container..."
+docker run -d \
+  --name sonarqube \
+  --restart unless-stopped \
+  -p 9000:9000 \
+  --link sonar-postgres:sonar-postgres \
+  -e SONAR_JDBC_URL=jdbc:postgresql://sonar-postgres:5432/sonar \
+  -e SONAR_JDBC_USERNAME=sonar \
+  -e SONAR_JDBC_PASSWORD=sonar \
+  -v sonarqube_data:/opt/sonarqube/data \
+  sonarqube:lts-community
 
 echo "Waiting for SonarQube to start..."
 sleep 60
