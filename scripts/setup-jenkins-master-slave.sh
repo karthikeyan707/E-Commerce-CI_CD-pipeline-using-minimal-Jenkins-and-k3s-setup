@@ -32,6 +32,16 @@ fi
 echo "Waiting for k3s to be ready..."
 sleep 10
 
+# Create jenkins user for kubectl configuration
+echo "Creating jenkins user..."
+if ! id -u jenkins &>/dev/null; then
+    useradd -m -s /bin/bash jenkins
+    usermod -aG docker jenkins
+    echo "Jenkins user created"
+else
+    echo "Jenkins user already exists"
+fi
+
 # Configure kubectl for jenkins user
 echo "Configuring kubectl for Jenkins..."
 mkdir -p /home/jenkins/.kube
@@ -60,9 +70,23 @@ docker run -d \
 echo "Waiting for Jenkins to start..."
 sleep 30
 
+# Create Jenkins agent container
+echo "Creating Jenkins agent container..."
+docker run -d \
+  --name jenkins-agent \
+  --restart unless-stopped \
+  --link jenkins-master:jenkins-master \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v /home/jenkins/.kube:/home/jenkins/.kube \
+  -e DOCKER_HOST=unix:///var/run/docker.sock \
+  jenkins/inbound-agent:latest -url http://jenkins-master:8080 jenkins-slave
+
+echo "Waiting for Jenkins agent to start..."
+sleep 15
+
 # Get Jenkins initial admin password
 echo "=========================================="
-echo "Jenkins Master Setup Complete!"
+echo "Jenkins Master/Slave Setup Complete!"
 echo "=========================================="
 echo "Access Jenkins at: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
 echo ""
@@ -79,10 +103,7 @@ echo "   - Git"
 echo "   - Docker Pipeline"
 echo "   - Kubernetes CLI"
 echo "   - SonarQube Scanner"
-echo "3. Configure Jenkins agent:"
-echo "   - Manage Jenkins -> Manage Nodes -> New Node"
-echo "   - Name: jenkins-slave"
-echo "   - Launch method: Launch agent by connecting it to the controller"
+echo "3. Jenkins agent is already running as 'jenkins-agent' container"
 echo "4. Configure credentials:"
 echo "   - dockerhub-credentials"
 echo "   - sonarqube-token"

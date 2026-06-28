@@ -78,8 +78,8 @@ pipeline {
                 script {
                     echo "Deploying PostgreSQL..."
                     sh """
-                        kubectl apply -f ${K8S_MANIFESTS_PATH}/deployment-postgres.yaml -n ${NAMESPACE}
-                        kubectl rollout status deployment/postgres -n ${NAMESPACE} --timeout=120s
+                        kubectl apply -f ${K8S_MANIFESTS_PATH}/statefulset-postgres.yaml -n ${NAMESPACE}
+                        kubectl rollout status statefulset/postgres -n ${NAMESPACE} --timeout=300s
                     """
                 }
             }

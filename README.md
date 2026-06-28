@@ -36,8 +36,9 @@ A microservices-based E-Commerce system with complete CI/CD pipeline on k3s (lig
 │      └───────────┬──────────┘  └────────┬──────────┘  └─────┬─────┘│
 │                  │                     │                   │      │
 │      ┌───────────▼─────────────────────▼───────────────────▼────┐│
-│      │           PostgreSQL Deployment (1 replica)              ││
-│      │           Databases: products_db, orders_db, users_db      ││
+│      │      PostgreSQL StatefulSet (3 replicas, Persistent)      ││
+│      │      Multi-AZ simulation with pod anti-affinity          ││
+│      │      Databases: products_db, orders_db, users_db          ││
 │      └──────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -117,13 +118,13 @@ E_Commerce-CICD/
 - AWS EC2 t3.small instance (1 vCPU, 2GB RAM) or equivalent
 - kubectl v1.28+
 - Docker v24+
-- Node.js 18+
+- Node.js 20+
 - curl
 - DockerHub account
 
 ### For Local Development
 - Docker v24+
-- Node.js 18+
+- Node.js 20+
 - npm
 
 ## Quick Start
@@ -197,10 +198,9 @@ docker exec jenkins-master cat /var/jenkins_home/secrets/initialAdminPassword
    - `sonarqube-token` - SonarQube authentication token
    - `nexus-credentials` - Nexus username/password
 
-4. Configure Jenkins agent:
-   - Manage Jenkins → Manage Nodes → New Node
-   - Name: `jenkins-slave`
-   - Launch method: Launch agent by connecting it to the controller
+4. **Jenkins agent is already automated** - The setup script creates both master and agent containers
+   - Verify agent is running: `docker ps | grep jenkins-agent`
+   - Agent should appear in Jenkins UI as "jenkins-slave"
 
 5. Create CI Pipeline:
    - New Item → Pipeline
@@ -270,9 +270,10 @@ kubectl get nodes -o wide
 ```
 
 **Resource Usage (k3s on t3.small):**
-- Total RAM: ~800MB (vs 2GB available)
-- Total CPU: ~0.4 cores (vs 1 core available)
+- Total RAM: ~1.2GB (vs 2GB available) - increased due to 3 PostgreSQL replicas
+- Total CPU: ~0.6 cores (vs 1 core available) - increased due to PostgreSQL StatefulSet
 - Cost: ~$10-15/month (AWS Free Tier)
+- **Note**: PostgreSQL uses persistent storage with 5Gi per replica
 
 ### 2. Local Development
 
@@ -662,9 +663,11 @@ kubectl logs <pod-name> --previous
 ```
 
 **Database connection failed**
-- Check PostgreSQL pod status: `kubectl get pods -l app=postgres`
+- Check PostgreSQL StatefulSet status: `kubectl get statefulset postgres`
+- Check PostgreSQL pods: `kubectl get pods -l app=postgres`
 - Check DB credentials in Kubernetes Secret
-- Verify PostgreSQL is ready: `kubectl exec -it postgres -- pg_isready -U postgres`
+- Verify PostgreSQL is ready: `kubectl exec -it postgres-0 -- pg_isready -U postgres`
+- Check persistent volumes: `kubectl get pvc`
 
 **Ingress not working**
 ```bash
@@ -675,8 +678,9 @@ kubectl describe ingress ecommerce-ingress
 
 **Jenkins agent not connecting**
 - Check Jenkins agent status in Jenkins UI
-- Verify agent label matches Jenkinsfile: `jenkins-slave`
+- Verify agent is running: `docker ps | grep jenkins-agent`
 - Check agent logs: `docker logs jenkins-agent`
+- Restart agent if needed: `docker restart jenkins-agent`
 
 **Docker build fails**
 - Verify Docker is running: `docker ps`

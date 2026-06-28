@@ -4,6 +4,9 @@ kind: Kustomization
 namespace: default
 
 resources:
+  # StorageClass
+  - storageclass.yaml
+  
   # ConfigMaps
   - configmap-postgres.yaml
   - configmap-product-service.yaml
@@ -16,8 +19,8 @@ resources:
   - secret-db.yaml
   - secret-user-service.yaml
   
-  # PostgreSQL (1 replica for ultra-low resources)
-  - deployment-postgres.yaml
+  # PostgreSQL (3 replicas with persistent storage for multi-AZ simulation)
+  - statefulset-postgres.yaml
   
   # Backend Services (1 replica each, minimal resources)
   - deployment-product-service.yaml

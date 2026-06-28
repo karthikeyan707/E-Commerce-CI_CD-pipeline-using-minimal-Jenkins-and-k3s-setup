@@ -47,7 +47,7 @@ echo "=========================================="
 echo "Updating image tags in manifests..."
 echo "=========================================="
 
-cd k8s/k3s-demo
+cd k8s/k3s-demo-ultra
 
 # Replace placeholder username
 sed -i "s|your-dockerhub-username|$DOCKERHUB_USERNAME|g" *.yaml
@@ -61,25 +61,25 @@ echo "=========================================="
 
 if [ "$USE_KUSTOMIZE" = true ]; then
     echo "Using Kustomize deployment..."
-    kubectl apply -k k8s/k3s-demo
+    kubectl apply -k k8s/k3s-demo-ultra
 else
     echo "Using manual deployment..."
     
     # Apply storage class
     echo "Applying storage class..."
-    kubectl apply -f k8s/k3s-demo/storageclass.yaml
+    kubectl apply -f k8s/k3s-demo-ultra/storageclass.yaml
     
     # Apply ConfigMaps
     echo "Applying ConfigMaps..."
-    kubectl apply -f k8s/k3s-demo/configmap-*.yaml
+    kubectl apply -f k8s/k3s-demo-ultra/configmap-*.yaml
     
     # Apply Secrets
     echo "Applying Secrets..."
-    kubectl apply -f k8s/k3s-demo/secret-*.yaml
+    kubectl apply -f k8s/k3s-demo-ultra/secret-*.yaml
     
     # Deploy PostgreSQL
-    echo "Deploying PostgreSQL (2 replicas for failover)..."
-    kubectl apply -f k8s/k3s-demo/statefulset-postgres.yaml
+    echo "Deploying PostgreSQL (3 replicas for multi-AZ simulation)..."
+    kubectl apply -f k8s/k3s-demo-ultra/statefulset-postgres.yaml
     
     # Wait for PostgreSQL
     echo "Waiting for PostgreSQL to be ready..."
@@ -87,10 +87,10 @@ else
     
     # Deploy backend services
     echo "Deploying backend services..."
-    kubectl apply -f k8s/k3s-demo/deployment-product-service.yaml
-    kubectl apply -f k8s/k3s-demo/deployment-order-service.yaml
-    kubectl apply -f k8s/k3s-demo/deployment-user-service.yaml
-    kubectl apply -f k8s/k3s-demo/deployment-api-gateway.yaml
+    kubectl apply -f k8s/k3s-demo-ultra/deployment-product-service.yaml
+    kubectl apply -f k8s/k3s-demo-ultra/deployment-order-service.yaml
+    kubectl apply -f k8s/k3s-demo-ultra/deployment-user-service.yaml
+    kubectl apply -f k8s/k3s-demo-ultra/deployment-api-gateway.yaml
     
     # Wait for backend services
     echo "Waiting for backend services..."
@@ -101,12 +101,12 @@ else
     
     # Deploy frontend
     echo "Deploying frontend..."
-    kubectl apply -f k8s/k3s-demo/deployment-frontend.yaml
+    kubectl apply -f k8s/k3s-demo-ultra/deployment-frontend.yaml
     kubectl rollout status deployment/frontend --timeout=120s
     
     # Apply ingress
     echo "Applying Traefik ingress..."
-    kubectl apply -f k8s/k3s-demo/ingress.yaml
+    kubectl apply -f k8s/k3s-demo-ultra/ingress.yaml
 fi
 
 # Verify deployment
