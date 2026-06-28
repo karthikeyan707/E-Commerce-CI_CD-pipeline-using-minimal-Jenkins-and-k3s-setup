@@ -88,7 +88,18 @@ sleep 15
 echo "=========================================="
 echo "Jenkins Master/Slave Setup Complete!"
 echo "=========================================="
-echo "Access Jenkins at: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
+
+# Try to get public IP (works on EC2)
+if curl -s --connect-timeout 2 http://169.254.169.254/latest/meta-data/public-ipv4 > /dev/null 2>&1; then
+    PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+    echo "Access Jenkins at: http://${PUBLIC_IP}:8080"
+else
+    # Fallback for non-EC2 environments
+    PUBLIC_IP=$(hostname -I | awk '{print $1}')
+    echo "Access Jenkins at: http://${PUBLIC_IP}:8080"
+    echo "Note: If running on EC2, use the public IP from AWS console"
+fi
+
 echo ""
 echo "Get initial admin password:"
 echo "docker exec jenkins-master cat /var/jenkins_home/secrets/initialAdminPassword"
