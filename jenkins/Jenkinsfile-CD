@@ -66,8 +66,8 @@ pipeline {
                 script {
                     echo "Applying ConfigMaps and Secrets..."
                     sh """
-                        kubectl apply -f ${K8S_MANIFESTS_PATH}/configmap-*.yaml -n ${NAMESPACE}
-                        kubectl apply -f ${K8S_MANIFESTS_PATH}/secret-*.yaml -n ${NAMESPACE}
+                        for f in ${K8S_MANIFESTS_PATH}/configmap-*.yaml; do kubectl apply -f "\$f" -n ${NAMESPACE}; done
+                        for f in ${K8S_MANIFESTS_PATH}/secret-*.yaml; do kubectl apply -f "\$f" -n ${NAMESPACE}; done
                     """
                 }
             }
