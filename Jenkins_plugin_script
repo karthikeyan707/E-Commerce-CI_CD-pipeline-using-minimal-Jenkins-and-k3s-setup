@@ -1,0 +1,39 @@
+import jenkins.model.Jenkins
+
+def plugins = [
+    "docker-workflow",          // Docker Pipeline
+    "kubernetes-cli",           // Kubernetes CLI
+    "sonar",                    // SonarQube Scanner
+    "github",                   // GitHub Integration
+    "workflow-aggregator",      // Pipeline
+    "git",                      // Git
+    "credentials-binding",      // Credentials Binding
+    "ssh-agent"                 // SSH Agent
+]
+
+def jenkins = Jenkins.instance
+def updateCenter = jenkins.updateCenter
+
+println "Updating Update Center..."
+updateCenter.updateAllSites()
+
+// Wait for update center metadata to download
+sleep(15000)
+
+plugins.each { pluginId ->
+    if (jenkins.pluginManager.getPlugin(pluginId)) {
+        println "✓ ${pluginId} is already installed."
+    } else {
+        def plugin = updateCenter.getPlugin(pluginId)
+        if (plugin) {
+            println "Installing ${pluginId}..."
+            plugin.deploy().get()
+            println "✓ ${pluginId} installation completed."
+        } else {
+            println "✗ Plugin '${pluginId}' not found in Update Center."
+        }
+    }
+}
+
+println "\nAll requested plugins have been processed."
+println "Please restart Jenkins to activate any newly installed plugins."
