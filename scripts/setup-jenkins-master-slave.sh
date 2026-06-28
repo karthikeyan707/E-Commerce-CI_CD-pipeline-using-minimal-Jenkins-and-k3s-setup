@@ -28,7 +28,7 @@ else
     echo "k3s is already installed"
 fi
 
-apt-get install -y fontconfig openjdk-17-jre
+apt-get install -y fontconfig openjdk-21-jre
 
 # Wait for k3s to be ready
 echo "Waiting for k3s to be ready..."
